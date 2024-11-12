@@ -27,12 +27,14 @@ public class FileStoreSourceReaderMetrics {
 
     private long latestFileCreationTime = UNDEFINED;
     private long lastSplitUpdateTime = UNDEFINED;
-
+    private long idleStartTime = ACTIVE;
+    public static final long ACTIVE = Long.MAX_VALUE;
     public static final long UNDEFINED = -1L;
 
     public FileStoreSourceReaderMetrics(MetricGroup sourceReaderMetricGroup) {
         sourceReaderMetricGroup.gauge(
                 MetricNames.CURRENT_FETCH_EVENT_TIME_LAG, this::getFetchTimeLag);
+        sourceReaderMetricGroup.gauge(MetricNames.SOURCE_IDLE_TIME, this::getIdleTime);
     }
 
     /** Called when consumed snapshot changes. */
@@ -44,9 +46,18 @@ public class FileStoreSourceReaderMetrics {
     @VisibleForTesting
     long getFetchTimeLag() {
         if (latestFileCreationTime != UNDEFINED) {
-            return lastSplitUpdateTime - latestFileCreationTime;
+            return getIdleTime() > 0
+                    ? System.currentTimeMillis() - latestFileCreationTime
+                    : lastSplitUpdateTime - latestFileCreationTime;
         }
         return UNDEFINED;
+    }
+
+    @VisibleForTesting
+    long getIdleTime() {
+        return lastSplitUpdateTime != UNDEFINED
+                ? System.currentTimeMillis() - lastSplitUpdateTime
+                : UNDEFINED;
     }
 
     public long getLatestFileCreationTime() {
